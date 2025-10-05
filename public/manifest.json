@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Habit Grow",
+  "name": "Habit Grow - สร้างนิสัยดี",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,7 +10,8 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
@@ -20,6 +21,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff",
+  "orientation": "portrait"
 }
