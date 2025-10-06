@@ -13,7 +13,8 @@ const HomeScreen = ({
   getCategoryInfo,
   setShowNotifications,
   setShowSideMenu,
-  setShowAddHabit
+  setShowAddHabit,
+  testNotification  // เพิ่มตรงนี้
 }) => {
   return (
     <div className="flex-1 bg-gray-50 p-4 overflow-y-auto h-full">
@@ -24,6 +25,17 @@ const HomeScreen = ({
           <p className="text-gray-600 mt-1 text-sm">{userName || userEmail}</p>
         </div>
         <div className="flex gap-2">
+          {/* Test Notification Button - เพิ่มใหม่ */}
+          {testNotification && (
+            <button
+              onClick={testNotification}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-blue-100 transition-colors duration-200"
+              title="ทดสอบการแจ้งเตือน"
+            >
+              <span className="text-lg">🧪</span>
+            </button>
+          )}
+          
           {/* Notifications Button */}
           <button
             onClick={() => setShowNotifications(true)}

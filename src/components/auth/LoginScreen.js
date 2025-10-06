@@ -1,7 +1,7 @@
 // src/components/auth/LoginScreen.js
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, getRedirectResult } from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 
 const LoginScreen = () => {
@@ -12,14 +12,32 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ตรวจสอบ redirect result เมื่อกลับมาจาก Google login
+  React.useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('Login successful via redirect');
+        }
+      } catch (error) {
+        console.error('Redirect error:', error);
+        setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+      }
+    };
+    checkRedirect();
+  }, []);
+
+  // ใช้ signInWithRedirect แทน signInWithPopup สำหรับมือถือ
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError('');
-      await signInWithPopup(auth, googleProvider);
+      // ใช้ redirect แทน popup เพื่อให้ทำงานได้บนมือถือทุกเครื่อง
+      await signInWithRedirect(auth, googleProvider);
     } catch (error) {
+      console.error('Google login error:', error);
       setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -45,6 +63,8 @@ const LoginScreen = () => {
         errorMessage = 'ไม่พบผู้ใช้นี้';
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = 'รหัสผ่านไม่ถูกต้อง';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง';
       }
       setError(errorMessage);
     } finally {

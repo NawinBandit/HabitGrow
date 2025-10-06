@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { saveHabits, loadHabits, saveJournalEntry, loadJournalEntries, saveUserProfile, loadUserProfile } from './services/firestoreService';
@@ -10,9 +10,11 @@ import HomeScreen from './components/Screens/HomeScreen';
 import StatsScreen from './components/Screens/StatsScreen';
 import JournalScreen from './components/Screens/JournalScreen';
 import SettingsScreen from './components/Screens/SettingsScreen';
+import GoalsScreen from './components/Screens/GoalsScreen';
 import NotificationsPanel from './components/modals/NotificationsPanel';
 import AddHabitModal from './components/modals/AddHabitModal';
 import SideMenu from './components/modals/SideMenu';
+import ProfileModal from './components/modals/ProfileModal';
 import BottomNavigation from './components/Navigation/BottomNavigation';
 
 const App = () => {
@@ -27,15 +29,35 @@ const App = () => {
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   
   const [habits, setHabits] = useState([]);
   const [journalEntries, setJournalEntries] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [userProfile, setUserProfile] = useState({
+    bio: '',
+    birthday: '',
+    location: '',
+    phone: ''
+  });
 
   const isInitialLoad = useRef(true);
   const hasLoadedData = useRef(false);
 
-  // ตรวจสอบสถานะการ login และโหลดข้อมูล
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('✅ Login successful via redirect');
+        }
+      } catch (error) {
+        console.error('❌ Redirect error:', error);
+      }
+    };
+    checkRedirectResult();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('🔍 Auth state changed:', user ? 'User found' : 'No user');
@@ -52,14 +74,18 @@ const App = () => {
           console.log('🔓 User logged in:', user.email, 'UID:', user.uid);
           
           try {
-            // โหลดโปรไฟล์ผู้ใช้
             const profile = await loadUserProfile(user.uid);
             if (profile) {
               setUserName(profile.name || '');
               setUserAvatar(profile.avatar || '🌱');
+              setUserProfile({
+                bio: profile.bio || '',
+                birthday: profile.birthday || '',
+                location: profile.location || '',
+                phone: profile.phone || ''
+              });
             }
 
-            // โหลดข้อมูลจาก Firestore
             const loadedHabits = await loadHabits(user.uid);
             const loadedJournals = await loadJournalEntries(user.uid);
             
@@ -133,6 +159,7 @@ const App = () => {
           setHabits([]);
           setJournalEntries([]);
           setNotifications([]);
+          setUserProfile({ bio: '', birthday: '', location: '', phone: '' });
           isInitialLoad.current = true;
           hasLoadedData.current = false;
         }
@@ -159,7 +186,6 @@ const App = () => {
     };
   }, []);
 
-  // บันทึกนิสัยอัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง
   useEffect(() => {
     if (userId && habits.length > 0 && !loading && !isInitialLoad.current && hasLoadedData.current) {
       console.log('💾 Auto-saving habits... Total:', habits.length);
@@ -176,7 +202,6 @@ const App = () => {
     }
   }, [habits, userId, loading]);
 
-  // ระบบรีเซ็ตนิสัยทุกวัน + เก็บประวัติ
   useEffect(() => {
     if (!isLoggedIn || habits.length === 0 || !userId) return;
 
@@ -184,18 +209,15 @@ const App = () => {
       const today = new Date().toDateString();
       const lastCheckDate = localStorage.getItem('lastCheckDate');
 
-      // ถ้าเป็นวันใหม่
       if (lastCheckDate !== today) {
         console.log('🌅 New day detected! Resetting habits...');
         
-        // บันทึกประวัติวันเก่า (ถ้ามีข้อมูลวันเก่า)
         if (lastCheckDate) {
           const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
           const completedCount = habits.filter(h => h.completed).length;
           const totalCount = habits.length;
           const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
           
-          // เก็บประวัติลง Firestore
           try {
             const userRef = doc(db, 'users', userId);
             const docSnap = await getDoc(userRef);
@@ -215,7 +237,7 @@ const App = () => {
             };
             
             await setDoc(userRef, {
-              history: [newHistoryEntry, ...existingHistory.slice(0, 89)] // เก็บ 90 วันล่าสุด
+              history: [newHistoryEntry, ...existingHistory.slice(0, 89)]
             }, { merge: true });
             
             console.log('📊 History saved:', newHistoryEntry);
@@ -224,7 +246,6 @@ const App = () => {
           }
         }
         
-        // รีเซ็ตสถานะ completed
         const resetHabits = habits.map(habit => ({
           ...habit,
           completed: false,
@@ -237,22 +258,17 @@ const App = () => {
           await saveHabits(userId, resetHabits);
         }
         
-        // บันทึกวันที่เช็กล่าสุด
         localStorage.setItem('lastCheckDate', today);
         console.log('✅ Habits reset for new day!');
       }
     };
 
-    // เช็กทันทีเมื่อโหลดแอป
     checkAndResetHabits();
-    
-    // เช็กทุก 1 ชั่วโมง
     const interval = setInterval(checkAndResetHabits, 3600000);
     
     return () => clearInterval(interval);
   }, [habits, isLoggedIn, userId]);
 
-  // ขอสิทธิ์การแจ้งเตือน
   useEffect(() => {
     if (isLoggedIn && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().then(permission => {
@@ -261,13 +277,14 @@ const App = () => {
     }
   }, [isLoggedIn]);
 
-  // ตรวจสอบการแจ้งเตือน
   useEffect(() => {
     if (!isLoggedIn) return;
     
     const checkNotifications = () => {
       const now = new Date();
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      console.log('🔔 Checking notifications at:', currentTime);
       
       habits.forEach(habit => {
         if (habit.notificationEnabled && habit.time === currentTime && !habit.completed) {
@@ -315,6 +332,31 @@ const App = () => {
     });
   };
 
+  const testNotification = () => {
+    const testNotif = {
+      id: Date.now(),
+      title: 'ทดสอบการแจ้งเตือน',
+      message: 'นี่คือการแจ้งเตือนทดสอบ - ระบบทำงานปกติ!',
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+    };
+    
+    addNotification(testNotif);
+    setShowNotifications(true);
+    
+    console.log('🧪 Test notification created:', testNotif);
+    
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('ทดสอบการแจ้งเตือน', {
+          body: 'นี่คือการแจ้งเตือนทดสอบ - ระบบทำงานปกติ!',
+          icon: '/logo192.png'
+        });
+      } catch (error) {
+        console.error('Error showing notification:', error);
+      }
+    }
+  };
+
   const handleLogout = async () => {
     try {
       console.log('🚪 Logging out...');
@@ -326,44 +368,46 @@ const App = () => {
     }
   };
 
-  // Update Profile
   const handleUpdateProfile = async (profileData) => {
-    console.log('🔄 Starting profile update...');
-    console.log('📝 Profile data:', profileData);
-    console.log('👤 Current userId:', userId);
-    console.log('📧 Current email:', userEmail);
+    console.log('🔄 Starting profile update...', profileData);
     
     setUserName(profileData.name);
     setUserAvatar(profileData.avatar);
+    setUserProfile({
+      bio: profileData.bio || '',
+      birthday: profileData.birthday || '',
+      location: profileData.location || '',
+      phone: profileData.phone || ''
+    });
     
     if (!userId) {
-      console.error('❌ No userId - cannot save profile');
       alert('ไม่พบ User ID กรุณา login ใหม่');
       return;
     }
     
     try {
-      console.log('💾 Saving to Firestore...');
       const success = await saveUserProfile(userId, {
         name: profileData.name,
         avatar: profileData.avatar,
-        email: userEmail
+        email: userEmail,
+        bio: profileData.bio || '',
+        birthday: profileData.birthday || '',
+        location: profileData.location || '',
+        phone: profileData.phone || ''
       });
       
       if (success) {
         console.log('✅ Profile saved successfully!');
         alert('บันทึกโปรไฟล์สำเร็จ!');
       } else {
-        console.error('❌ Save returned false');
         alert('บันทึกไม่สำเร็จ กรุณาลองใหม่');
       }
     } catch (error) {
-      console.error('❌ Error saving profile:', error);
+      console.error('Error saving profile:', error);
       alert('เกิดข้อผิดพลาด: ' + error.message);
     }
   };
 
-  // Toggle Habit
   const toggleHabit = async (id) => {
     const updatedHabits = habits.map(habit => 
       habit.id === id ? { 
@@ -377,7 +421,7 @@ const App = () => {
     setHabits(updatedHabits);
     
     if (userId && !isInitialLoad.current) {
-      console.log('✅ Toggled habit:', id, '- Saving to Firestore...');
+      console.log('✅ Toggled habit:', id);
       try {
         await saveHabits(userId, updatedHabits);
       } catch (error) {
@@ -386,7 +430,6 @@ const App = () => {
     }
   };
 
-  // Add Habit
   const addHabit = async (habitData) => {
     const newHabit = {
       id: Date.now(),
@@ -409,7 +452,6 @@ const App = () => {
     }
   };
 
-  // Delete Habit
   const deleteHabit = async (id) => {
     console.log('🗑️ Deleting habit:', id);
     const updatedHabits = habits.filter(habit => habit.id !== id);
@@ -424,7 +466,6 @@ const App = () => {
     }
   };
 
-  // Add Journal Entry
   const addJournalEntry = async (entry) => {
     const newEntry = { 
       ...entry, 
@@ -456,6 +497,7 @@ const App = () => {
       userEmail,
       userName,
       userAvatar,
+      userProfile,
       notifications, 
       journalEntries,
       toggleHabit, 
@@ -464,7 +506,8 @@ const App = () => {
       getCategoryInfo,
       setShowNotifications, 
       setShowSideMenu, 
-      setShowAddHabit
+      setShowAddHabit,
+      testNotification
     };
 
     switch(currentTab) {
@@ -474,6 +517,8 @@ const App = () => {
         return <StatsScreen {...screenProps} />;
       case 'journal': 
         return <JournalScreen {...screenProps} />;
+      case 'goals':
+        return <GoalsScreen {...screenProps} userId={userId} />;
       case 'settings': 
         return <SettingsScreen 
           {...screenProps} 
@@ -503,18 +548,14 @@ const App = () => {
 
   return (
     <div className="max-w-sm mx-auto bg-white min-h-screen flex flex-col relative">
-      {/* Header Bar */}
       <div className="h-8 bg-gradient-to-r from-green-500 to-emerald-600" />
       
-      {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         {renderCurrentScreen()}
       </div>
       
-      {/* Bottom Navigation */}
       <BottomNavigation currentTab={currentTab} setCurrentTab={setCurrentTab} />
       
-      {/* Modals */}
       {showNotifications && (
         <NotificationsPanel 
           notifications={notifications} 
@@ -538,6 +579,20 @@ const App = () => {
           notifications={notifications} 
           onClose={() => setShowSideMenu(false)} 
           onLogout={handleLogout}
+          setCurrentTab={setCurrentTab}
+          setShowNotifications={setShowNotifications}
+          setShowEditProfile={setShowEditProfile}
+        />
+      )}
+
+      {showEditProfile && (
+        <ProfileModal
+          userEmail={userEmail}
+          userName={userName}
+          userAvatar={userAvatar}
+          userProfile={userProfile}
+          onClose={() => setShowEditProfile(false)}
+          onSave={handleUpdateProfile}
         />
       )}
     </div>
