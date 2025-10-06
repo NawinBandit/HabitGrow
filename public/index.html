@@ -3,14 +3,24 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#10b981" />
+    
+    <!-- เพิ่ม meta สำหรับ authentication -->
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    
+    <!-- iOS Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Habit Grow" />
     
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>Habit Grow</title>
+    <title>Habit Grow - สร้างนิสัยดี</title>
+    
+    <meta name="description" content="แอปพลิเคชันสร้างนิสัยดีและติดตามความก้าวหน้า" />
   </head>
   <body>
     <noscript>คุณต้องเปิด JavaScript เพื่อใช้งานแอปนี้</noscript>
