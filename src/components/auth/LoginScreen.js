@@ -17,37 +17,31 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ตรวจสอบ redirect result เมื่อกลับมาจาก Google
   useEffect(() => {
     const checkRedirect = async () => {
       try {
-        setLoading(true);
         const result = await getRedirectResult(auth);
         if (result) {
-          console.log('Login successful via redirect');
+          console.log('✅ Login successful via redirect');
         }
       } catch (error) {
-        console.error('Redirect error:', error);
+        console.error('❌ Redirect error:', error);
         if (error.code !== 'auth/invalid-api-key') {
           setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
         }
-      } finally {
-        setLoading(false);
       }
     };
     checkRedirect();
   }, []);
 
-  // ใช้ Redirect แทน Popup - ทำงานได้บนมือถือทุกเครื่อง
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError('');
-      console.log('Starting Google sign in with redirect...');
+      console.log('🔐 Starting Google sign in...');
       await signInWithRedirect(auth, googleProvider);
-      // จะ redirect ไปหน้า Google และกลับมาอัตโนมัติ
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error('❌ Google login error:', error);
       setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
       setLoading(false);
     }
@@ -58,25 +52,62 @@ const LoginScreen = () => {
     setError('');
     setLoading(true);
 
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setError('กรุณากรอกอีเมลและรหัสผ่าน');
+      setLoading(false);
+      return;
+    }
+
+    if (loginPassword.length < 6) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('🔐 Attempting login with:', loginEmail);
+      
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+        const result = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+        console.log('✅ Sign up successful:', result.user.email);
       } else {
-        await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+        const result = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+        console.log('✅ Login successful:', result.user.email);
       }
     } catch (error) {
+      console.error('❌ Auth error:', error.code, error.message);
+      
       let errorMessage = 'เกิดข้อผิดพลาด';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'อีเมลนี้ถูกใช้งานแล้ว';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
-      } else if (error.code === 'auth/user-not-found') {
-        errorMessage = 'ไม่พบผู้ใช้นี้';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'รหัสผ่านไม่ถูกต้อง';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง';
+      
+      switch(error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'ไม่พบผู้ใช้นี้ กรุณาสมัครสมาชิก';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'รหัสผ่านไม่ถูกต้อง';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'ไม่สามารถเชื่อมต่ออินเทอร์เน็ต';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'มีการพยายาม login มากเกินไป กรุณารอสักครู่';
+          break;
+        default:
+          errorMessage = `เกิดข้อผิดพลาด: ${error.code}`;
       }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);

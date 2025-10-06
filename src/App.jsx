@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { saveHabits, loadHabits, saveJournalEntry, loadJournalEntries, saveUserProfile, loadUserProfile } from './services/firestoreService';
@@ -43,6 +43,36 @@ const App = () => {
 
   const isInitialLoad = useRef(true);
   const hasLoadedData = useRef(false);
+
+  // ตั้งค่า Auth Persistence - เพิ่มใหม่
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        console.log('✅ Auth persistence set to LOCAL');
+      } catch (error) {
+        console.error('❌ Error setting persistence:', error);
+      }
+    };
+    
+    initAuth();
+  }, []);
+
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('✅ Login successful via redirect');
+        }
+      } catch (error) {
+        console.error('❌ Redirect error:', error);
+      }
+    };
+    checkRedirectResult();
+  }, []);
+
+  // ... (ส่วนที่เหลือของ App.jsx เหมือนเดิมทั้งหมด - ไม่ต้องแก้)
 
   useEffect(() => {
     const checkRedirectResult = async () => {
