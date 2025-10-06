@@ -1,4 +1,3 @@
-// src/components/auth/LoginScreen.js
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { 
@@ -65,17 +64,23 @@ const LoginScreen = () => {
     }
 
     try {
-      console.log('🔐 Attempting login with:', loginEmail);
+      console.log('🔐 Starting login...');
       
+      let result;
       if (isSignUp) {
-        const result = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-        console.log('✅ Sign up successful:', result.user.email);
+        result = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+        console.log('✅ Sign up successful');
       } else {
-        const result = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-        console.log('✅ Login successful:', result.user.email);
+        result = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+        console.log('✅ Login successful');
       }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      console.log('✅ User authenticated:', result.user.email);
+      
     } catch (error) {
-      console.error('❌ Auth error:', error.code, error.message);
+      console.error('❌ Auth error:', error.code);
       
       let errorMessage = 'เกิดข้อผิดพลาด';
       
@@ -109,7 +114,6 @@ const LoginScreen = () => {
       }
       
       setError(errorMessage);
-    } finally {
       setLoading(false);
     }
   };

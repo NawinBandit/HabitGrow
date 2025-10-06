@@ -44,181 +44,145 @@ const App = () => {
   const isInitialLoad = useRef(true);
   const hasLoadedData = useRef(false);
 
-  // ตั้งค่า Auth Persistence - เพิ่มใหม่
   useEffect(() => {
-    const initAuth = async () => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('✅ Login successful via redirect');
+        }
+      } catch (error) {
+        console.error('❌ Redirect error:', error);
+      }
+    };
+    checkRedirectResult();
+  }, []);
+
+  useEffect(() => {
+    let unsubscribe;
+    
+    const setupAuth = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-        console.log('✅ Auth persistence set to LOCAL');
+        console.log('✅ Persistence set');
+        
+        unsubscribe = onAuthStateChanged(auth, async (user) => {
+          console.log('🔍 Auth state:', user ? user.email : 'No user');
+          
+          if (user) {
+            setTimeout(async () => {
+              try {
+                isInitialLoad.current = true;
+                
+                setUserId(user.uid);
+                setUserEmail(user.email);
+                
+                const profile = await loadUserProfile(user.uid);
+                if (profile) {
+                  setUserName(profile.name || '');
+                  setUserAvatar(profile.avatar || '🌱');
+                  setUserProfile({
+                    bio: profile.bio || '',
+                    birthday: profile.birthday || '',
+                    location: profile.location || '',
+                    phone: profile.phone || ''
+                  });
+                }
+
+                const loadedHabits = await loadHabits(user.uid);
+                if (loadedHabits.length > 0) {
+                  console.log('🔥 Loaded habits:', loadedHabits.length);
+                  setHabits(loadedHabits);
+                } else {
+                  const defaultHabits = [
+                    { 
+                      id: Date.now(), 
+                      name: 'ดื่มน้ำ 2 ลิตร', 
+                      completed: false, 
+                      streak: 0, 
+                      category: 'health', 
+                      time: '08:00', 
+                      notificationEnabled: true,
+                      createdAt: new Date().toISOString()
+                    },
+                    { 
+                      id: Date.now() + 1, 
+                      name: 'อ่านหนังสือ 30 นาที', 
+                      completed: false, 
+                      streak: 0, 
+                      category: 'learning', 
+                      time: '20:00', 
+                      notificationEnabled: true,
+                      createdAt: new Date().toISOString()
+                    }
+                  ];
+                  setHabits(defaultHabits);
+                  await saveHabits(user.uid, defaultHabits);
+                }
+
+                const loadedJournals = await loadJournalEntries(user.uid);
+                if (loadedJournals.length > 0) {
+                  setJournalEntries(loadedJournals);
+                }
+                
+                hasLoadedData.current = true;
+                setIsLoggedIn(true);
+                
+                setTimeout(() => {
+                  isInitialLoad.current = false;
+                  console.log('✅ Login complete');
+                }, 500);
+                
+              } catch (error) {
+                console.error('❌ Error loading data:', error);
+                setIsLoggedIn(true);
+                isInitialLoad.current = false;
+              } finally {
+                setLoading(false);
+              }
+            }, 300);
+            
+          } else {
+            console.log('🚪 No user');
+            setIsLoggedIn(false);
+            setUserId(null);
+            setUserEmail('');
+            setUserName('');
+            setUserAvatar('🌱');
+            setHabits([]);
+            setJournalEntries([]);
+            setNotifications([]);
+            setUserProfile({ bio: '', birthday: '', location: '', phone: '' });
+            isInitialLoad.current = true;
+            hasLoadedData.current = false;
+            setLoading(false);
+          }
+        });
+        
       } catch (error) {
-        console.error('❌ Error setting persistence:', error);
+        console.error('❌ Auth setup error:', error);
+        setLoading(false);
       }
     };
     
-    initAuth();
-  }, []);
-
-  useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log('✅ Login successful via redirect');
-        }
-      } catch (error) {
-        console.error('❌ Redirect error:', error);
-      }
-    };
-    checkRedirectResult();
-  }, []);
-
-  // ... (ส่วนที่เหลือของ App.jsx เหมือนเดิมทั้งหมด - ไม่ต้องแก้)
-
-  useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log('✅ Login successful via redirect');
-        }
-      } catch (error) {
-        console.error('❌ Redirect error:', error);
-      }
-    };
-    checkRedirectResult();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('🔍 Auth state changed:', user ? 'User found' : 'No user');
-      
-      try {
-        if (user) {
-          isInitialLoad.current = true;
-          hasLoadedData.current = false;
-          
-          setUserId(user.uid);
-          setUserEmail(user.email);
-          setIsLoggedIn(true);
-          
-          console.log('🔓 User logged in:', user.email, 'UID:', user.uid);
-          
-          try {
-            const profile = await loadUserProfile(user.uid);
-            if (profile) {
-              setUserName(profile.name || '');
-              setUserAvatar(profile.avatar || '🌱');
-              setUserProfile({
-                bio: profile.bio || '',
-                birthday: profile.birthday || '',
-                location: profile.location || '',
-                phone: profile.phone || ''
-              });
-            }
-
-            const loadedHabits = await loadHabits(user.uid);
-            const loadedJournals = await loadJournalEntries(user.uid);
-            
-            if (loadedHabits.length > 0) {
-              console.log('🔥 Loaded habits:', loadedHabits.length, 'items');
-              setHabits(loadedHabits);
-            } else {
-              console.log('📝 Creating default habits for new user');
-              const defaultHabits = [
-                { 
-                  id: Date.now(), 
-                  name: 'ดื่มน้ำ 2 ลิตร', 
-                  completed: false, 
-                  streak: 0, 
-                  category: 'health', 
-                  time: '08:00', 
-                  notificationEnabled: true,
-                  createdAt: new Date().toISOString()
-                },
-                { 
-                  id: Date.now() + 1, 
-                  name: 'อ่านหนังสือ 30 นาที', 
-                  completed: false, 
-                  streak: 0, 
-                  category: 'learning', 
-                  time: '20:00', 
-                  notificationEnabled: true,
-                  createdAt: new Date().toISOString()
-                }
-              ];
-              setHabits(defaultHabits);
-              await saveHabits(user.uid, defaultHabits);
-            }
-            
-            if (loadedJournals.length > 0) {
-              console.log('🔥 Loaded journal entries:', loadedJournals.length, 'items');
-              setJournalEntries(loadedJournals);
-            }
-            
-            hasLoadedData.current = true;
-            
-          } catch (error) {
-            console.error('❌ Error loading user data:', error);
-            const defaultHabits = [
-              { 
-                id: Date.now(), 
-                name: 'ดื่มน้ำ 2 ลิตร', 
-                completed: false, 
-                streak: 0, 
-                category: 'health', 
-                time: '08:00', 
-                notificationEnabled: true 
-              }
-            ];
-            setHabits(defaultHabits);
-            hasLoadedData.current = true;
-          }
-          
-          setTimeout(() => {
-            isInitialLoad.current = false;
-            console.log('✅ Initial load completed');
-          }, 500);
-          
-        } else {
-          console.log('🚪 User logged out');
-          setIsLoggedIn(false);
-          setUserId(null);
-          setUserEmail('');
-          setUserName('');
-          setUserAvatar('🌱');
-          setHabits([]);
-          setJournalEntries([]);
-          setNotifications([]);
-          setUserProfile({ bio: '', birthday: '', location: '', phone: '' });
-          isInitialLoad.current = true;
-          hasLoadedData.current = false;
-        }
-      } catch (error) {
-        console.error('❌ Critical error in auth:', error);
-      } finally {
-        setLoading(false);
-      }
-    }, (error) => {
-      console.error('❌ Auth subscription error:', error);
-      setLoading(false);
-    });
+    setupAuth();
     
     const timeout = setTimeout(() => {
       if (loading) {
-        console.warn('⚠️ Loading timeout - forcing complete');
+        console.warn('⚠️ Loading timeout');
         setLoading(false);
       }
     }, 10000);
     
     return () => {
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
       clearTimeout(timeout);
     };
   }, []);
 
   useEffect(() => {
     if (userId && habits.length > 0 && !loading && !isInitialLoad.current && hasLoadedData.current) {
-      console.log('💾 Auto-saving habits... Total:', habits.length);
+      console.log('💾 Auto-saving habits...');
       const saveData = async () => {
         try {
           await saveHabits(userId, habits);
@@ -240,7 +204,7 @@ const App = () => {
       const lastCheckDate = localStorage.getItem('lastCheckDate');
 
       if (lastCheckDate !== today) {
-        console.log('🌅 New day detected! Resetting habits...');
+        console.log('🌅 New day detected!');
         
         if (lastCheckDate) {
           const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
@@ -270,7 +234,7 @@ const App = () => {
               history: [newHistoryEntry, ...existingHistory.slice(0, 89)]
             }, { merge: true });
             
-            console.log('📊 History saved:', newHistoryEntry);
+            console.log('📊 History saved');
           } catch (error) {
             console.error('❌ Error saving history:', error);
           }
@@ -289,7 +253,7 @@ const App = () => {
         }
         
         localStorage.setItem('lastCheckDate', today);
-        console.log('✅ Habits reset for new day!');
+        console.log('✅ Habits reset');
       }
     };
 
@@ -301,9 +265,7 @@ const App = () => {
 
   useEffect(() => {
     if (isLoggedIn && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        console.log('🔔 Notification permission:', permission);
-      });
+      Notification.requestPermission();
     }
   }, [isLoggedIn]);
 
@@ -313,8 +275,6 @@ const App = () => {
     const checkNotifications = () => {
       const now = new Date();
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      
-      console.log('🔔 Checking notifications at:', currentTime);
       
       habits.forEach(habit => {
         if (habit.notificationEnabled && habit.time === currentTime && !habit.completed) {
@@ -328,21 +288,9 @@ const App = () => {
           
           addNotification(notification);
           
-          if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-            navigator.serviceWorker.ready.then((registration) => {
-              registration.showNotification('ถึงเวลาทำนิสัย', {
-                body: `ได้เวลาทำ "${habit.name}" แล้ว`,
-                icon: '/logo192.png',
-                badge: '/logo192.png',
-                vibrate: [200, 100, 200],
-                tag: `habit-${habit.id}`,
-                requireInteraction: true
-              });
-            }).catch(() => {
-              new Notification('ถึงเวลาทำนิสัย', {
-                body: `ได้เวลาทำ "${habit.name}" แล้ว`,
-                icon: '/logo192.png'
-              });
+          if (Notification.permission === 'granted') {
+            new Notification('ถึงเวลาทำนิสัย', {
+              body: `ได้เวลาทำ "${habit.name}" แล้ว`
             });
           }
         }
@@ -373,23 +321,15 @@ const App = () => {
     addNotification(testNotif);
     setShowNotifications(true);
     
-    console.log('🧪 Test notification created:', testNotif);
-    
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification('ทดสอบการแจ้งเตือน', {
-          body: 'นี่คือการแจ้งเตือนทดสอบ - ระบบทำงานปกติ!',
-          icon: '/logo192.png'
-        });
-      } catch (error) {
-        console.error('Error showing notification:', error);
-      }
+    if (Notification.permission === 'granted') {
+      new Notification('ทดสอบการแจ้งเตือน', {
+        body: 'ระบบทำงานปกติ!'
+      });
     }
   };
 
   const handleLogout = async () => {
     try {
-      console.log('🚪 Logging out...');
       await auth.signOut();
       setShowSideMenu(false);
       setCurrentTab('home');
@@ -399,8 +339,6 @@ const App = () => {
   };
 
   const handleUpdateProfile = async (profileData) => {
-    console.log('🔄 Starting profile update...', profileData);
-    
     setUserName(profileData.name);
     setUserAvatar(profileData.avatar);
     setUserProfile({
@@ -411,7 +349,7 @@ const App = () => {
     });
     
     if (!userId) {
-      alert('ไม่พบ User ID กรุณา login ใหม่');
+      alert('ไม่พบ User ID');
       return;
     }
     
@@ -427,10 +365,7 @@ const App = () => {
       });
       
       if (success) {
-        console.log('✅ Profile saved successfully!');
         alert('บันทึกโปรไฟล์สำเร็จ!');
-      } else {
-        alert('บันทึกไม่สำเร็จ กรุณาลองใหม่');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -451,11 +386,10 @@ const App = () => {
     setHabits(updatedHabits);
     
     if (userId && !isInitialLoad.current) {
-      console.log('✅ Toggled habit:', id);
       try {
         await saveHabits(userId, updatedHabits);
       } catch (error) {
-        console.error('Error saving toggled habit:', error);
+        console.error('Error saving habit:', error);
       }
     }
   };
@@ -469,7 +403,6 @@ const App = () => {
       createdAt: new Date().toISOString()
     };
     
-    console.log('➕ Adding new habit:', newHabit.name);
     const updatedHabits = [...habits, newHabit];
     setHabits(updatedHabits);
     
@@ -477,13 +410,12 @@ const App = () => {
       try {
         await saveHabits(userId, updatedHabits);
       } catch (error) {
-        console.error('Error saving new habit:', error);
+        console.error('Error saving habit:', error);
       }
     }
   };
 
   const deleteHabit = async (id) => {
-    console.log('🗑️ Deleting habit:', id);
     const updatedHabits = habits.filter(habit => habit.id !== id);
     setHabits(updatedHabits);
     
@@ -503,7 +435,6 @@ const App = () => {
       createdAt: new Date().toISOString()
     };
     
-    console.log('📝 Adding journal entry');
     setJournalEntries([newEntry, ...journalEntries]);
     
     if (userId) {
