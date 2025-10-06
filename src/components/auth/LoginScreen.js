@@ -1,7 +1,12 @@
 // src/components/auth/LoginScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, getRedirectResult } from 'firebase/auth';
+import { 
+  signInWithRedirect, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  getRedirectResult 
+} from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 
 const LoginScreen = () => {
@@ -12,29 +17,35 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ตรวจสอบ redirect result เมื่อกลับมาจาก Google login
-  React.useEffect(() => {
+  // ตรวจสอบ redirect result เมื่อกลับมาจาก Google
+  useEffect(() => {
     const checkRedirect = async () => {
       try {
+        setLoading(true);
         const result = await getRedirectResult(auth);
         if (result) {
           console.log('Login successful via redirect');
         }
       } catch (error) {
         console.error('Redirect error:', error);
-        setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+        if (error.code !== 'auth/invalid-api-key') {
+          setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+        }
+      } finally {
+        setLoading(false);
       }
     };
     checkRedirect();
   }, []);
 
-  // ใช้ signInWithRedirect แทน signInWithPopup สำหรับมือถือ
+  // ใช้ Redirect แทน Popup - ทำงานได้บนมือถือทุกเครื่อง
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError('');
-      // ใช้ redirect แทน popup เพื่อให้ทำงานได้บนมือถือทุกเครื่อง
+      console.log('Starting Google sign in with redirect...');
       await signInWithRedirect(auth, googleProvider);
+      // จะ redirect ไปหน้า Google และกลับมาอัตโนมัติ
     } catch (error) {
       console.error('Google login error:', error);
       setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
@@ -92,10 +103,16 @@ const LoginScreen = () => {
             </div>
           )}
 
+          {loading && (
+            <div className="bg-blue-50 text-blue-600 p-3 rounded-lg mb-4 text-sm text-center">
+              กำลังดำเนินการ...
+            </div>
+          )}
+
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 py-3 rounded-lg font-medium transition-all mb-4 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 py-3 rounded-lg font-medium transition-all mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -124,6 +141,7 @@ const LoginScreen = () => {
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -139,11 +157,13 @@ const LoginScreen = () => {
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  disabled={loading}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -153,7 +173,7 @@ const LoginScreen = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'กำลังดำเนินการ...' : (isSignUp ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ')}
             </button>
@@ -166,6 +186,7 @@ const LoginScreen = () => {
                 setError('');
               }}
               className="text-gray-600 hover:text-gray-800"
+              disabled={loading}
             >
               {isSignUp ? 'มีบัญชีอยู่แล้ว? ' : 'ยังไม่มีบัญชี? '}
               <span className="text-green-600 font-semibold">
