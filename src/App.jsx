@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, getRedirectResult, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { saveHabits, loadHabits, saveJournalEntry, loadJournalEntries, saveUserProfile, loadUserProfile } from './services/firestoreService';
@@ -44,106 +44,98 @@ const App = () => {
   const isInitialLoad = useRef(true);
   const hasLoadedData = useRef(false);
 
-  useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log('✅ Login successful via redirect');
-        }
-      } catch (error) {
-        console.error('❌ Redirect error:', error);
-      }
-    };
-    checkRedirectResult();
-  }, []);
-
+  // ✨ จัดการ Auth State
   useEffect(() => {
     let unsubscribe;
     
     const setupAuth = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-        console.log('✅ Persistence set');
+        console.log('✅ Persistence set to LOCAL (using Popup method)');
         
         unsubscribe = onAuthStateChanged(auth, async (user) => {
-          console.log('🔍 Auth state:', user ? user.email : 'No user');
+          console.log('🔐 Auth state changed:', user ? user.email : 'No user');
           
           if (user) {
-            setTimeout(async () => {
-              try {
-                isInitialLoad.current = true;
-                
-                setUserId(user.uid);
-                setUserEmail(user.email);
-                
-                const profile = await loadUserProfile(user.uid);
-                if (profile) {
-                  setUserName(profile.name || '');
-                  setUserAvatar(profile.avatar || '🌱');
-                  setUserProfile({
-                    bio: profile.bio || '',
-                    birthday: profile.birthday || '',
-                    location: profile.location || '',
-                    phone: profile.phone || ''
-                  });
-                }
-
-                const loadedHabits = await loadHabits(user.uid);
-                if (loadedHabits.length > 0) {
-                  console.log('🔥 Loaded habits:', loadedHabits.length);
-                  setHabits(loadedHabits);
-                } else {
-                  const defaultHabits = [
-                    { 
-                      id: Date.now(), 
-                      name: 'ดื่มน้ำ 2 ลิตร', 
-                      completed: false, 
-                      streak: 0, 
-                      category: 'health', 
-                      time: '08:00', 
-                      notificationEnabled: true,
-                      createdAt: new Date().toISOString()
-                    },
-                    { 
-                      id: Date.now() + 1, 
-                      name: 'อ่านหนังสือ 30 นาที', 
-                      completed: false, 
-                      streak: 0, 
-                      category: 'learning', 
-                      time: '20:00', 
-                      notificationEnabled: true,
-                      createdAt: new Date().toISOString()
-                    }
-                  ];
-                  setHabits(defaultHabits);
-                  await saveHabits(user.uid, defaultHabits);
-                }
-
-                const loadedJournals = await loadJournalEntries(user.uid);
-                if (loadedJournals.length > 0) {
-                  setJournalEntries(loadedJournals);
-                }
-                
-                hasLoadedData.current = true;
-                setIsLoggedIn(true);
-                
-                setTimeout(() => {
-                  isInitialLoad.current = false;
-                  console.log('✅ Login complete');
-                }, 500);
-                
-              } catch (error) {
-                console.error('❌ Error loading data:', error);
-                setIsLoggedIn(true);
-                isInitialLoad.current = false;
-              } finally {
-                setLoading(false);
+            console.log('👤 User detected, loading data...');
+            
+            try {
+              isInitialLoad.current = true;
+              
+              setUserId(user.uid);
+              setUserEmail(user.email);
+              
+              // โหลดโปรไฟล์
+              const profile = await loadUserProfile(user.uid);
+              if (profile) {
+                setUserName(profile.name || '');
+                setUserAvatar(profile.avatar || '🌱');
+                setUserProfile({
+                  bio: profile.bio || '',
+                  birthday: profile.birthday || '',
+                  location: profile.location || '',
+                  phone: profile.phone || ''
+                });
               }
-            }, 300);
+
+              // โหลดนิสัย
+              const loadedHabits = await loadHabits(user.uid);
+              if (loadedHabits.length > 0) {
+                console.log('📋 Loaded habits:', loadedHabits.length);
+                setHabits(loadedHabits);
+              } else {
+                console.log('📋 No habits found, creating defaults...');
+                const defaultHabits = [
+                  { 
+                    id: Date.now(), 
+                    name: 'ดื่มน้ำ 2 ลิตร', 
+                    completed: false, 
+                    streak: 0, 
+                    category: 'health', 
+                    time: '08:00', 
+                    notificationEnabled: true,
+                    createdAt: new Date().toISOString()
+                  },
+                  { 
+                    id: Date.now() + 1, 
+                    name: 'อ่านหนังสือ 30 นาที', 
+                    completed: false, 
+                    streak: 0, 
+                    category: 'learning', 
+                    time: '20:00', 
+                    notificationEnabled: true,
+                    createdAt: new Date().toISOString()
+                  }
+                ];
+                setHabits(defaultHabits);
+                await saveHabits(user.uid, defaultHabits);
+              }
+
+              // โหลด journal
+              const loadedJournals = await loadJournalEntries(user.uid);
+              if (loadedJournals.length > 0) {
+                setJournalEntries(loadedJournals);
+              }
+              
+              hasLoadedData.current = true;
+              setIsLoggedIn(true);
+              
+              // รอให้ UI อัพเดท
+              setTimeout(() => {
+                isInitialLoad.current = false;
+                setLoading(false);
+                console.log('✅ Login complete and data loaded!');
+              }, 500);
+              
+            } catch (error) {
+              console.error('❌ Error loading user data:', error);
+              setIsLoggedIn(true);
+              setLoading(false);
+              isInitialLoad.current = false;
+            }
             
           } else {
-            console.log('🚪 No user');
+            console.log('🚪 No user - showing login screen');
             setIsLoggedIn(false);
             setUserId(null);
             setUserEmail('');
@@ -167,9 +159,10 @@ const App = () => {
     
     setupAuth();
     
+    // Timeout backup
     const timeout = setTimeout(() => {
       if (loading) {
-        console.warn('⚠️ Loading timeout');
+        console.warn('⚠️ Loading timeout - forcing complete');
         setLoading(false);
       }
     }, 10000);

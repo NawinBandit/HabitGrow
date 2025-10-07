@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { 
-  signInWithRedirect, 
+  signInWithPopup,
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  getRedirectResult 
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 
@@ -16,32 +15,50 @@ const LoginScreen = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          console.log('✅ Login successful via redirect');
-        }
-      } catch (error) {
-        console.error('❌ Redirect error:', error);
-        if (error.code !== 'auth/invalid-api-key') {
-          setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
-        }
-      }
-    };
-    checkRedirect();
-  }, []);
-
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError('');
-      console.log('🔐 Starting Google sign in...');
-      await signInWithRedirect(auth, googleProvider);
+      console.log('🔐 Starting Google sign in with POPUP...');
+      
+      // ใช้ popup แทน redirect เพื่อ debug
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('✅ Login successful!');
+      console.log('👤 User:', result.user.email);
+      
+      // Auth state จะจัดการต่อใน App.jsx
+      
     } catch (error) {
       console.error('❌ Google login error:', error);
-      setError('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
+      let errorMessage = 'เข้าสู่ระบบไม่สำเร็จ: ';
+      
+      switch(error.code) {
+        case 'auth/popup-blocked':
+          errorMessage += 'เบราว์เซอร์บล็อก popup กรุณาอนุญาต popup';
+          break;
+        case 'auth/popup-closed-by-user':
+          errorMessage += 'ปิด popup ก่อนเข้าสู่ระบบเสร็จ';
+          break;
+        case 'auth/unauthorized-domain':
+          errorMessage += 'Domain นี้ไม่ได้รับอนุญาตใน Firebase Console';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage += 'Google Sign-in ยังไม่ได้เปิดใช้งานใน Firebase Console';
+          break;
+        case 'auth/invalid-api-key':
+          errorMessage += 'API Key ไม่ถูกต้อง';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage += 'มี popup อื่นเปิดอยู่';
+          break;
+        default:
+          errorMessage += error.message;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -75,9 +92,8 @@ const LoginScreen = () => {
         console.log('✅ Login successful');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       console.log('✅ User authenticated:', result.user.email);
+      // App.jsx จะจัดการ auth state change
       
     } catch (error) {
       console.error('❌ Auth error:', error.code);
